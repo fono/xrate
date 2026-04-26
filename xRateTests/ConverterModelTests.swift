@@ -7,7 +7,7 @@ final class ConverterModelTests: XCTestCase {
     private func makeModel(
         currencies: [Currency] = ConverterModel.defaultCurrencies,
         baseCode: String = "HUF",
-        amountText: String = "20000"
+        amount: Double = 20000
     ) -> ConverterModel {
         let suiteName = "xrate.tests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -16,7 +16,7 @@ final class ConverterModelTests: XCTestCase {
         let model = ConverterModel(defaults: defaults)
         model.currencies = currencies
         model.baseCode = baseCode
-        model.amountText = amountText
+        model.amount = amount
 
         // Inject deterministic snapshot (rates against EUR, like Frankfurter).
         model.snapshot = RateSnapshot(
@@ -66,18 +66,17 @@ final class ConverterModelTests: XCTestCase {
     }
 
     func testSetBaseReExpressesAmount() {
-        let model = makeModel(baseCode: "HUF", amountText: "20000")
+        let model = makeModel(baseCode: "HUF", amount: 20000)
         model.setBase("USD")
         XCTAssertEqual(model.baseCode, "USD")
-        let amount = ConverterModel.parse(model.amountText)
-        XCTAssertEqual(amount, 55.0, accuracy: 0.0001)
+        XCTAssertEqual(model.amount, 55.0, accuracy: 0.0001)
     }
 
     func testSetSameBaseIsNoOp() {
-        let model = makeModel(baseCode: "HUF", amountText: "20000")
+        let model = makeModel(baseCode: "HUF", amount: 20000)
         model.setBase("HUF")
         XCTAssertEqual(model.baseCode, "HUF")
-        XCTAssertEqual(model.amountText, "20000")
+        XCTAssertEqual(model.amount, 20000)
     }
 
     func testSetBaseToUnknownCurrencyIsIgnored() {
@@ -90,7 +89,7 @@ final class ConverterModelTests: XCTestCase {
         let model = makeModel()
         model.removeCurrency("HUF")
         XCTAssertEqual(model.baseCode, "EUR")
-        XCTAssertEqual(model.amountText, "")
+        XCTAssertEqual(model.amount, 0)
         XCTAssertFalse(model.currencies.contains(where: { $0.code == "HUF" }))
     }
 
@@ -98,7 +97,7 @@ final class ConverterModelTests: XCTestCase {
         let model = makeModel()
         model.removeCurrency("USD")
         XCTAssertEqual(model.baseCode, "HUF")
-        XCTAssertEqual(model.amountText, "20000")
+        XCTAssertEqual(model.amount, 20000)
         XCTAssertFalse(model.currencies.contains(where: { $0.code == "USD" }))
     }
 
@@ -140,6 +139,23 @@ final class ConverterModelTests: XCTestCase {
         XCTAssertEqual(ConverterModel.parse("1\u{00A0}234,5"), 1234.5, accuracy: 0.0001)
     }
 
+    func testFormatRule() {
+        // Empty for zero.
+        XCTAssertEqual(ConverterModel.format(0), "")
+        // Integer-valued → no fraction digits.
+        XCTAssertFalse(ConverterModel.format(20000).contains("."))
+        XCTAssertFalse(ConverterModel.format(20000).contains(","))
+        XCTAssertFalse(ConverterModel.format(55).contains("."))
+        // Non-integer → exactly two fraction digits (separator depends on locale).
+        let formatted = ConverterModel.format(55.5)
+        XCTAssertTrue(formatted.hasSuffix("50"), "Expected 2 fraction digits, got \(formatted)")
+        let formatted2 = ConverterModel.format(0.5)
+        XCTAssertTrue(formatted2.hasSuffix("50"), "Expected 2 fraction digits, got \(formatted2)")
+        // Rounds to 2 fraction digits.
+        let formatted3 = ConverterModel.format(1234.567)
+        XCTAssertTrue(formatted3.hasSuffix("57"), "Expected rounded 1234.57, got \(formatted3)")
+    }
+
     func testPersistenceRoundTrip() throws {
         let suiteName = "xrate.tests.persist.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -151,7 +167,7 @@ final class ConverterModelTests: XCTestCase {
             Currency(code: "JPY", name: "Japanese Yen")
         ]
         m1.baseCode = "JPY"
-        m1.amountText = "12345.6"
+        m1.amount = 12345.6
         m1.snapshot = RateSnapshot(
             base: "EUR",
             date: "2026-04-26",
@@ -162,9 +178,20 @@ final class ConverterModelTests: XCTestCase {
         let m2 = ConverterModel(defaults: defaults)
         XCTAssertEqual(m2.currencies.map(\.code), ["HUF", "JPY"])
         XCTAssertEqual(m2.baseCode, "JPY")
-        XCTAssertEqual(m2.amountText, "12345.6")
+        XCTAssertEqual(m2.amount, 12345.6, accuracy: 0.0001)
         XCTAssertNotNil(m2.snapshot)
         XCTAssertEqual(m2.snapshot?.rates["HUF"], 400.0)
+    }
+
+    func testPersistenceMigratesLegacyAmountText() {
+        let suiteName = "xrate.tests.legacy.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        // Simulate state written by an earlier version that stored amountText.
+        defaults.set("12345.6", forKey: ConverterModel.Keys.amountText)
+
+        let model = ConverterModel(defaults: defaults)
+        XCTAssertEqual(model.amount, 12345.6, accuracy: 0.0001)
     }
 
     func testStaleSnapshot() {

@@ -37,7 +37,7 @@ struct ContentView: View {
 
             StatusBar(model: model)
         }
-        .navigationTitle("Xrate")
+        .navigationTitle("xRate")
         .toolbar {
             ToolbarItemGroup(placement: .automatic) {
                 Button {

@@ -1,10 +1,20 @@
 import SwiftUI
 import AppKit
 
+/// AppKit-backed numeric input. The model stores a Double; this field
+/// formats it for display and parses user input back into a Double.
+///
+/// - When NOT focused: stringValue is set to `format(displayValue)`.
+/// - When focus arrives: stringValue is reset to `format(displayValue)` so
+///   the user starts editing from the clean formatted form.
+/// - While focused: stringValue is left alone (the user's typed text is the
+///   source of truth). Each keystroke is parsed and reported via `onUserEdit`.
 struct AmountField: NSViewRepresentable {
-    @Binding var text: String
+    let displayValue: Double
     let isFocused: Bool
     var placeholder: String = "0"
+    /// Fired on every keystroke with the parsed numeric value.
+    var onUserEdit: (Double) -> Void = { _ in }
     /// Fired synchronously on every click (before AppKit's focus handling).
     var onClickFocus: () -> Void = {}
     /// Fired for Tab (false) and Shift-Tab (true).
@@ -45,29 +55,17 @@ struct AmountField: NSViewRepresentable {
             tf.onClickFocus = { [coord] in coord.parent.onClickFocus() }
         }
 
-        if nsView.stringValue != text {
-            // Preserve selection across the text replacement so a re-render
-            // (e.g. from setBase reformatting amountText) doesn't collapse a
-            // selection that Tab arrival just set.
-            let editor = nsView.currentEditor()
-            let prevText = nsView.stringValue
-            let prevSelection = editor?.selectedRange
-            let prevWasFullSelection: Bool = {
-                guard let r = prevSelection else { return false }
-                return r.length > 0 && r.length == (prevText as NSString).length
-            }()
-
-            nsView.stringValue = text
-
-            if let editor = nsView.currentEditor() {
-                if prevWasFullSelection {
-                    editor.selectAll(nil)
-                } else if let prev = prevSelection {
-                    let len = (text as NSString).length
-                    let loc = min(prev.location, len)
-                    let lenSel = min(prev.length, max(0, len - loc))
-                    editor.selectedRange = NSRange(location: loc, length: lenSel)
-                }
+        let formatted = ConverterModel.format(displayValue)
+        // Sync stringValue from the model when:
+        //  - the field is not focused (always show the clean formatted value);
+        //  - the field is just gaining focus (reset stale typed text before
+        //    the user starts editing).
+        // While focused (lastIsFocused == true) we leave stringValue alone —
+        // the user is editing and any rewrite would clobber their input.
+        let justGainedFocus = isFocused && !coord.lastIsFocused
+        if !isFocused || justGainedFocus {
+            if nsView.stringValue != formatted {
+                nsView.stringValue = formatted
             }
         }
 
@@ -95,7 +93,8 @@ struct AmountField: NSViewRepresentable {
 
         func controlTextDidChange(_ obj: Notification) {
             guard let tf = obj.object as? NSTextField else { return }
-            parent.text = tf.stringValue
+            let parsed = ConverterModel.parse(tf.stringValue)
+            parent.onUserEdit(parsed)
         }
 
         func control(_ control: NSControl,
@@ -116,11 +115,9 @@ struct AmountField: NSViewRepresentable {
 }
 
 /// NSTextField that:
-/// - Fires `onClickFocus` synchronously on `mouseDown`, BEFORE
-///   `super.mouseDown` runs AppKit's focus / cell-editing logic. The caller
-///   uses this to set base + focus atomically with the click.
-/// - Skips `selectText` during the click (so AppKit's cell-editing path
-///   doesn't briefly select all when starting to edit).
+/// - Fires `onClickFocus` synchronously on `mouseDown`, BEFORE AppKit's
+///   focus / cell-editing path runs.
+/// - Skips `selectText` during the click (no select-all flash on click).
 /// - Selects all on focus arrival via Tab / programmatic `makeFirstResponder`
 ///   (focus that does NOT come from a mouseDown).
 private final class ClickFocusTextField: NSTextField {
@@ -136,9 +133,6 @@ private final class ClickFocusTextField: NSTextField {
 
     override func selectText(_ sender: Any?) {
         if inMouseDown {
-            // Become first responder if needed, but skip the "select all"
-            // half of selectText so the click's cursor placement isn't
-            // fighting an immediate selection.
             if let win = window,
                win.firstResponder !== self,
                win.firstResponder !== currentEditor() {

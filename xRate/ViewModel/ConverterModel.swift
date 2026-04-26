@@ -14,8 +14,11 @@ final class ConverterModel {
         didSet { defaults.set(baseCode, forKey: Keys.baseCode) }
     }
 
-    var amountText: String {
-        didSet { defaults.set(amountText, forKey: Keys.amountText) }
+    /// The amount the user has entered, expressed in `baseCode`. The single
+    /// numeric source of truth — fields format this on display and parse user
+    /// input back into it.
+    var amount: Double {
+        didSet { defaults.set(amount, forKey: Keys.amount) }
     }
 
     var snapshot: RateSnapshot? {
@@ -54,7 +57,15 @@ final class ConverterModel {
             resolvedBase = loadedCurrencies.first?.code ?? "EUR"
         }
 
-        let loadedAmount = defaults.string(forKey: Keys.amountText) ?? ""
+        let loadedAmount: Double
+        if defaults.object(forKey: Keys.amount) != nil {
+            loadedAmount = defaults.double(forKey: Keys.amount)
+        } else if let legacy = defaults.string(forKey: Keys.amountText) {
+            // Migrate from earlier "amountText" string storage.
+            loadedAmount = Self.parse(legacy)
+        } else {
+            loadedAmount = 0
+        }
 
         let loadedSnapshot: RateSnapshot?
         if let data = defaults.data(forKey: Keys.snapshot),
@@ -66,7 +77,7 @@ final class ConverterModel {
 
         self.currencies = loadedCurrencies
         self.baseCode = resolvedBase
-        self.amountText = loadedAmount
+        self.amount = loadedAmount
         self.snapshot = loadedSnapshot
     }
 
@@ -81,7 +92,8 @@ final class ConverterModel {
     enum Keys {
         static let currencies = "xrate.selectedCurrencies"
         static let baseCode = "xrate.baseCode"
-        static let amountText = "xrate.amountText"
+        static let amount = "xrate.amount"
+        static let amountText = "xrate.amountText"   // legacy (migrated)
         static let snapshot = "xrate.snapshot"
     }
 
@@ -110,8 +122,6 @@ final class ConverterModel {
         guard let f = snapshot?.fetchedAt else { return true }
         return Date().timeIntervalSince(f) > 6 * 60 * 60
     }
-
-    var amount: Double { Self.parse(amountText) }
 
     /// Locale-agnostic parser for amount input. Handles both "." and "," as
     /// decimal separators, strips Unicode whitespace, and uses a heuristic for
@@ -169,6 +179,23 @@ final class ConverterModel {
         return Double(v) ?? 0
     }
 
+    /// Locale-aware display formatter for amounts.
+    /// Rule: 0 fraction digits when the value is integer-valued, else exactly 2.
+    nonisolated static func format(_ value: Double) -> String {
+        if value == 0 { return "" }
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.usesGroupingSeparator = true
+        if value == value.rounded() {
+            formatter.maximumFractionDigits = 0
+            formatter.minimumFractionDigits = 0
+        } else {
+            formatter.maximumFractionDigits = 2
+            formatter.minimumFractionDigits = 2
+        }
+        return formatter.string(from: NSNumber(value: value)) ?? ""
+    }
+
     func convert(amount: Double, from: String, to: String) -> Double? {
         guard let rates else { return nil }
         guard let fromRate = rates[from], let toRate = rates[to], fromRate > 0 else { return nil }
@@ -186,8 +213,8 @@ final class ConverterModel {
         guard code != baseCode else { return }
         guard currencies.contains(where: { $0.code == code }) else { return }
 
-        if let converted = convert(amount: amount, from: baseCode, to: code), amount != 0 {
-            amountText = NumberFormatting.display(converted)
+        if amount != 0, let converted = convert(amount: amount, from: baseCode, to: code) {
+            amount = converted
         }
         baseCode = code
     }
@@ -201,7 +228,7 @@ final class ConverterModel {
         currencies.removeAll { $0.code == code }
         if baseCode == code {
             baseCode = currencies.first?.code ?? "EUR"
-            amountText = ""
+            amount = 0
         }
     }
 
@@ -227,5 +254,4 @@ final class ConverterModel {
             self.errorMessage = error.localizedDescription
         }
     }
-
 }

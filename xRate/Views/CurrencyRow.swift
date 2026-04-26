@@ -7,6 +7,13 @@ struct CurrencyRow: View {
 
     private var isBase: Bool { currency.code == model.baseCode }
 
+    /// Numeric value to show in this row's input — the model's `amount`
+    /// expressed in this row's currency.
+    private var displayValue: Double {
+        if isBase { return model.amount }
+        return model.convert(amount: model.amount, from: model.baseCode, to: currency.code) ?? 0
+    }
+
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
@@ -20,8 +27,17 @@ struct CurrencyRow: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 AmountField(
-                    text: textBinding,
+                    displayValue: displayValue,
                     isFocused: focusedCode == currency.code,
+                    onUserEdit: { newAmount in
+                        // User typed in this row. Make this row the base (so
+                        // `amount` is in this currency's units), then store
+                        // the typed value.
+                        if currency.code != model.baseCode {
+                            model.setBase(currency.code)
+                        }
+                        model.amount = newAmount
+                    },
                     onClickFocus: { switchHere() },
                     onTab: { reverse in advanceFocus(reverse: reverse) }
                 )
@@ -57,23 +73,6 @@ struct CurrencyRow: View {
         .font(.caption2)
         .foregroundStyle(.secondary)
         .monospacedDigit()
-    }
-
-    private var textBinding: Binding<String> {
-        Binding(
-            get: {
-                if isBase { return model.amountText }
-                guard let value = model.convert(amount: model.amount, from: model.baseCode, to: currency.code),
-                      value != 0 else { return "" }
-                return NumberFormatting.display(value)
-            },
-            set: { newValue in
-                if model.baseCode != currency.code {
-                    model.setBase(currency.code)
-                }
-                model.amountText = newValue
-            }
-        )
     }
 
     /// Make this row the base currency and the focused row, synchronously.
