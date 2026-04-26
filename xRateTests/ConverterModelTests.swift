@@ -1,5 +1,5 @@
 import XCTest
-@testable import Xrate
+@testable import xRate
 
 @MainActor
 final class ConverterModelTests: XCTestCase {

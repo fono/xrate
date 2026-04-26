@@ -15,9 +15,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "TG00000000000000000000A1"
-               BuildableName = "Xrate.app"
-               BlueprintName = "Xrate"
-               ReferencedContainer = "container:Xrate.xcodeproj">
+               BuildableName = "xRate.app"
+               BlueprintName = "xRate"
+               ReferencedContainer = "container:xRate.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -33,9 +33,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "TG00000000000000000000A2"
-               BuildableName = "XrateTests.xctest"
-               BlueprintName = "XrateTests"
-               ReferencedContainer = "container:Xrate.xcodeproj">
+               BuildableName = "xRateTests.xctest"
+               BlueprintName = "xRateTests"
+               ReferencedContainer = "container:xRate.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -55,9 +55,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "TG00000000000000000000A1"
-            BuildableName = "Xrate.app"
-            BlueprintName = "Xrate"
-            ReferencedContainer = "container:Xrate.xcodeproj">
+            BuildableName = "xRate.app"
+            BlueprintName = "xRate"
+            ReferencedContainer = "container:xRate.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -72,9 +72,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "TG00000000000000000000A1"
-            BuildableName = "Xrate.app"
-            BlueprintName = "Xrate"
-            ReferencedContainer = "container:Xrate.xcodeproj">
+            BuildableName = "xRate.app"
+            BlueprintName = "xRate"
+            ReferencedContainer = "container:xRate.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

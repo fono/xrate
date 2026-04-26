@@ -1,11 +1,11 @@
 import SwiftUI
 
 @main
-struct XrateApp: App {
+struct xRateApp: App {
     @State private var model = ConverterModel()
 
     var body: some Scene {
-        WindowGroup("Xrate") {
+        WindowGroup("xRate") {
             ContentView(model: model)
                 .frame(minWidth: 480, minHeight: 360)
         }
