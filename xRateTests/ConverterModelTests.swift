@@ -143,17 +143,23 @@ final class ConverterModelTests: XCTestCase {
         // Empty for zero.
         XCTAssertEqual(ConverterModel.format(0), "")
         // Integer-valued → no fraction digits.
-        XCTAssertFalse(ConverterModel.format(20000).contains("."))
-        XCTAssertFalse(ConverterModel.format(20000).contains(","))
         XCTAssertFalse(ConverterModel.format(55).contains("."))
+        XCTAssertFalse(ConverterModel.format(55).contains(","))
         // Non-integer → exactly two fraction digits (separator depends on locale).
-        let formatted = ConverterModel.format(55.5)
-        XCTAssertTrue(formatted.hasSuffix("50"), "Expected 2 fraction digits, got \(formatted)")
-        let formatted2 = ConverterModel.format(0.5)
-        XCTAssertTrue(formatted2.hasSuffix("50"), "Expected 2 fraction digits, got \(formatted2)")
+        XCTAssertTrue(ConverterModel.format(55.5).hasSuffix("50"))
+        XCTAssertTrue(ConverterModel.format(0.5).hasSuffix("50"))
         // Rounds to 2 fraction digits.
-        let formatted3 = ConverterModel.format(1234.567)
-        XCTAssertTrue(formatted3.hasSuffix("57"), "Expected rounded 1234.57, got \(formatted3)")
+        XCTAssertTrue(ConverterModel.format(1234.567).hasSuffix("57"))
+    }
+
+    func testFormatRoundsToIntegerSkipsFractions() {
+        // Values whose 2-digit-rounded form is an integer should display
+        // without fractional digits at all (no "109.00" / "109,00").
+        for v in [109.001, 109.999, 0.001, 999.997] {
+            let s = ConverterModel.format(v)
+            XCTAssertFalse(s.contains("."), "\(v) → \(s) should not contain '.'")
+            XCTAssertFalse(s.contains(","), "\(v) → \(s) should not contain ','")
+        }
     }
 
     func testPersistenceRoundTrip() throws {

@@ -180,13 +180,16 @@ final class ConverterModel {
     }
 
     /// Locale-aware display formatter for amounts.
-    /// Rule: 0 fraction digits when the value is integer-valued, else exactly 2.
+    /// Rule: 0 fraction digits when the value rounded to 2 decimals is
+    /// integer-valued (so 109.001 shows as "109", not "109.00"); else
+    /// exactly 2 fraction digits.
     nonisolated static func format(_ value: Double) -> String {
         if value == 0 { return "" }
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
         formatter.usesGroupingSeparator = true
-        if value == value.rounded() {
+        let roundedTo2 = (value * 100).rounded() / 100
+        if roundedTo2 == roundedTo2.rounded() {
             formatter.maximumFractionDigits = 0
             formatter.minimumFractionDigits = 0
         } else {
