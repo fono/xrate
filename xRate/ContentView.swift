@@ -20,6 +20,11 @@ struct ContentView: View {
                         currency: currency,
                         focusedCode: $focusedCode
                     )
+                    .listRowBackground(
+                        currency.code == model.baseCode
+                            ? Color.gray.opacity(0.15)
+                            : Color.clear
+                    )
                     .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                         Button(role: .destructive) {
                             model.removeCurrency(currency.code)
