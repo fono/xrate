@@ -162,6 +162,76 @@ final class ConverterModelTests: XCTestCase {
         }
     }
 
+    // MARK: calculator input
+
+    func testApplyInputEvaluatesExpression() {
+        let model = makeModel()
+        model.applyInput("70*1.27", from: "HUF")
+        XCTAssertEqual(model.amount, 88.9, accuracy: 1e-9)
+        XCTAssertEqual(model.expressionResult ?? .nan, 88.9, accuracy: 1e-9)
+    }
+
+    func testApplyInputWithPlainNumberLeavesNoExpressionResult() {
+        let model = makeModel()
+        model.applyInput("88.9", from: "HUF")
+        XCTAssertEqual(model.amount, 88.9, accuracy: 1e-9)
+        XCTAssertNil(model.expressionResult)
+    }
+
+    func testApplyInputKeepsTheFieldsGroupingRules() {
+        let model = makeModel()
+        model.applyInput("1.234", from: "HUF")
+        XCTAssertEqual(model.amount, 1234)
+        XCTAssertNil(model.expressionResult)
+    }
+
+    func testApplyInputFromNonBaseRowSwitchesBaseFirst() {
+        let model = makeModel(baseCode: "HUF", amount: 20000)
+        model.applyInput("(40-12)/6", from: "USD")
+        XCTAssertEqual(model.baseCode, "USD")
+        XCTAssertEqual(model.amount, 28.0 / 6.0, accuracy: 1e-9)
+        XCTAssertEqual(model.expressionResult ?? .nan, 28.0 / 6.0, accuracy: 1e-9)
+    }
+
+    func testApplyInputHoldsAmountWhenExpressionIsUnevaluable() {
+        let model = makeModel(amount: 20000)
+        model.applyInput(")(", from: "HUF")
+        XCTAssertEqual(model.amount, 20000)
+        XCTAssertNil(model.expressionResult)
+    }
+
+    func testApplyInputHoldsAmountOnDivisionByZero() {
+        let model = makeModel(amount: 20000)
+        model.applyInput("1/0", from: "HUF")
+        XCTAssertEqual(model.amount, 20000)
+        XCTAssertNil(model.expressionResult)
+    }
+
+    func testSetBaseClearsExpressionResult() {
+        let model = makeModel()
+        model.applyInput("70*1.27", from: "HUF")
+        XCTAssertNotNil(model.expressionResult)
+
+        model.setBase("EUR")
+        XCTAssertNil(model.expressionResult)
+        // The amount is still re-expressed in the new base, as before.
+        XCTAssertEqual(model.amount, 88.9 / 400.0, accuracy: 1e-9)
+    }
+
+    func testExpressionResultIsNotPersisted() {
+        let suiteName = "xrate.tests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+
+        let model = ConverterModel(defaults: defaults)
+        model.applyInput("70*1.27", from: model.baseCode)
+        XCTAssertNotNil(model.expressionResult)
+
+        let reloaded = ConverterModel(defaults: defaults)
+        XCTAssertNil(reloaded.expressionResult)
+        XCTAssertEqual(reloaded.amount, 88.9, accuracy: 1e-9)
+    }
+
     func testPersistenceRoundTrip() throws {
         let suiteName = "xrate.tests.persist.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!

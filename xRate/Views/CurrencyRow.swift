@@ -29,14 +29,8 @@ struct CurrencyRow: View {
                 AmountField(
                     displayValue: displayValue,
                     isFocused: focusedCode == currency.code,
-                    onUserEdit: { newAmount in
-                        // User typed in this row. Make this row the base (so
-                        // `amount` is in this currency's units), then store
-                        // the typed value.
-                        if currency.code != model.baseCode {
-                            model.setBase(currency.code)
-                        }
-                        model.amount = newAmount
+                    onUserEdit: { text in
+                        model.applyInput(text, from: currency.code)
                     },
                     onClickFocus: { switchHere() },
                     onTab: { reverse in advanceFocus(reverse: reverse) }
@@ -60,7 +54,11 @@ struct CurrencyRow: View {
         VStack(alignment: .trailing, spacing: 1) {
             if isBase {
                 Text("Base currency")
-                Text(" ").hidden()
+                if let result = model.expressionResult {
+                    Text("= \(Self.resultText(result))")
+                } else {
+                    Text(" ").hidden()
+                }
             } else if let perOne = model.pricePerUnit(of: currency.code, in: model.baseCode),
                       let inverse = model.pricePerUnit(of: model.baseCode, in: currency.code) {
                 Text("1 \(currency.code) = \(NumberFormatting.perUnit(perOne)) \(model.baseCode)")
@@ -73,6 +71,13 @@ struct CurrencyRow: View {
         .font(.caption2)
         .foregroundStyle(.secondary)
         .monospacedDigit()
+    }
+
+    /// `ConverterModel.format` renders 0 as "" by design (empty field), which
+    /// would leave a bare "= " here.
+    private static func resultText(_ value: Double) -> String {
+        let formatted = ConverterModel.format(value)
+        return formatted.isEmpty ? "0" : formatted
     }
 
     /// Make this row the base currency and the focused row, synchronously.

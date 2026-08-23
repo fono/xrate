@@ -8,13 +8,14 @@ import AppKit
 /// - When focus arrives: stringValue is reset to `format(displayValue)` so
 ///   the user starts editing from the clean formatted form.
 /// - While focused: stringValue is left alone (the user's typed text is the
-///   source of truth). Each keystroke is parsed and reported via `onUserEdit`.
+///   source of truth). Each keystroke is reported verbatim via `onUserEdit`;
+///   parsing (and expression evaluation) happens in the model.
 struct AmountField: NSViewRepresentable {
     let displayValue: Double
     let isFocused: Bool
     var placeholder: String = "0"
-    /// Fired on every keystroke with the parsed numeric value.
-    var onUserEdit: (Double) -> Void = { _ in }
+    /// Fired on every keystroke with the raw text the user has typed.
+    var onUserEdit: (String) -> Void = { _ in }
     /// Fired synchronously on every click (before AppKit's focus handling).
     var onClickFocus: () -> Void = {}
     /// Fired for Tab (false) and Shift-Tab (true).
@@ -93,8 +94,7 @@ struct AmountField: NSViewRepresentable {
 
         func controlTextDidChange(_ obj: Notification) {
             guard let tf = obj.object as? NSTextField else { return }
-            let parsed = ConverterModel.parse(tf.stringValue)
-            parent.onUserEdit(parsed)
+            parent.onUserEdit(tf.stringValue)
         }
 
         func control(_ control: NSControl,

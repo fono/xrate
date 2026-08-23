@@ -31,6 +31,11 @@ final class ConverterModel {
     var errorMessage: String?
     var isLoading: Bool = false
 
+    /// Result of the expression currently in the edited field, or nil when the
+    /// field holds a plain number. Drives the "= …" line under Base currency.
+    /// Transient — never persisted.
+    var expressionResult: Double?
+
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let service: RatesService
 
@@ -199,6 +204,29 @@ final class ConverterModel {
         return formatter.string(from: NSNumber(value: value)) ?? ""
     }
 
+    /// Evaluates raw field text: an arithmetic expression when it contains an
+    /// operator, otherwise a plain number. Returns nil only when an expression
+    /// cannot be evaluated (the caller should then keep the previous amount).
+    nonisolated static func value(forInput text: String) -> Double? {
+        ExpressionEvaluator.containsOperator(text)
+            ? ExpressionEvaluator.evaluate(text)
+            : parse(text)
+    }
+
+    /// Handles a keystroke in the row for `code`: that row becomes the base
+    /// (so `amount` is in its units), then the typed value is stored.
+    func applyInput(_ text: String, from code: String) {
+        if code != baseCode { setBase(code) }
+        let isExpression = ExpressionEvaluator.containsOperator(text)
+        guard let value = Self.value(forInput: text) else {
+            // Unevaluable expression: hold the previous amount.
+            expressionResult = nil
+            return
+        }
+        amount = value
+        expressionResult = isExpression ? value : nil
+    }
+
     func convert(amount: Double, from: String, to: String) -> Double? {
         guard let rates else { return nil }
         guard let fromRate = rates[from], let toRate = rates[to], fromRate > 0 else { return nil }
@@ -215,6 +243,9 @@ final class ConverterModel {
     func setBase(_ code: String) {
         guard code != baseCode else { return }
         guard currencies.contains(where: { $0.code == code }) else { return }
+
+        // Leaving a row commits whatever expression it held.
+        expressionResult = nil
 
         if amount != 0, let converted = convert(amount: amount, from: baseCode, to: code) {
             amount = converted
